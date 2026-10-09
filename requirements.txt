@@ -1,0 +1,44 @@
+# VoicePilot — Python Dependencies
+
+# Core API server
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.0
+websockets>=12.0
+python-multipart>=0.0.9
+
+# Speech-to-Text
+faster-whisper>=1.0.0
+
+# LLM (Ollama client)
+ollama>=0.2.0
+
+# Text-to-Speech (Piper TTS)
+piper-tts>=1.2.0
+
+# Desktop Automation
+pyautogui>=0.9.54
+Pillow>=10.0.0
+
+# Browser Automation
+playwright>=1.43.0
+
+# OCR
+paddlepaddle>=2.6.0
+paddleocr>=2.7.0
+
+# Database
+aiosqlite>=0.20.0
+
+# Audio
+sounddevice>=0.4.6
+numpy>=1.26.0
+scipy>=1.13.0
+
+# Utilities
+pydantic>=2.7.0
+python-dotenv>=1.0.0
+loguru>=0.7.2
+
+# Optional cloud providers (extras)
+# openai>=1.30.0
+# deepgram-sdk>=3.2.0

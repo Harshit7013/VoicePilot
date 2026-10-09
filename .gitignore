@@ -1,0 +1,52 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Build artifacts & distribution
+dist/
+build/
+*.egg-info/
+
+# Node & Frontend
+node_modules/
+apps/desktop/node_modules/
+apps/desktop/dist/
+*.tsbuildinfo
+apps/desktop/tsconfig.tsbuildinfo
+
+# Environment variables & secrets
+.env
+.env.local
+.env.*.local
+*.env
+!.env.example
+
+# Runtime databases & local media
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+data/screenshots/*
+!data/screenshots/.gitkeep
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
