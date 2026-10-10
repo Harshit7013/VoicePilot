@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI):
     global _agent
     _agent = VoicePilotAgent(
         stt=WhisperSTTProvider(model_size=os.getenv("WHISPER_MODEL", "base")),
-        llm=LocalOfflineLLMProvider(model=os.getenv("OLLAMA_MODEL", "qwen2.5:7b")),
+        llm=LocalOfflineLLMProvider(model=os.getenv("OLLAMA_MODEL", "qwen2.5:1.5b")),
         tts=PiperTTSProvider(),
         auto_approve_medium=os.getenv("AUTO_APPROVE_MEDIUM", "false").lower() == "true",
     )
@@ -190,6 +190,6 @@ if __name__ == "__main__":
         "agent.api:app",
         host="127.0.0.1",
         port=8765,
-        reload=False,
+        reload=True,
         log_level="info",
     )

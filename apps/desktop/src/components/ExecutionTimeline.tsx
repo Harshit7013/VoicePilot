@@ -2,24 +2,25 @@
  * ExecutionTimeline — shows the current task's step-by-step execution.
  */
 
-import type { FC } from 'react';
+import type { FC, ReactNode } from 'react';
 import type { AgentEvent } from '../hooks/useVoicePilot';
+import { ListTodo, Mic, Terminal, MousePointer2, Keyboard, FileText, Trash, Move, Copy, Folder, Search, CheckSquare, Globe, Eye, Zap, FileCode2, Clock, Image, FileSearch, Navigation, Check, X } from 'lucide-react';
 
 interface ExecutionTimelineProps {
   events: AgentEvent[];
   currentPlan: Record<string, unknown> | null;
 }
 
-function getActionIcon(action: string): string {
-  const icons: Record<string, string> = {
-    open_application: '🚀', click: '👆', type_text: '⌨️', press_key: '⌨️',
-    take_screenshot: '📸', scroll: '↕️',
-    create_file: '📄', read_file: '📖', write_file: '✏️', delete_file: '🗑️',
-    move_file: '📦', copy_file: '📋', create_directory: '📁',
-    list_directory: '📋', find_files: '🔍', verify_file: '✅',
-    open_browser: '🌐', navigate: '🌍', browser_click: '👆',
-    browser_type: '⌨️', browser_search: '🔎', browser_extract: '📤',
-    wait: '⏱️', verify_state: '🔍', default: '⚡',
+function getActionIcon(action: string): ReactNode {
+  const icons: Record<string, ReactNode> = {
+    open_application: <Terminal size={14} />, click: <MousePointer2 size={14} />, type_text: <Keyboard size={14} />, press_key: <Keyboard size={14} />,
+    take_screenshot: <Image size={14} />, scroll: <Navigation size={14} />,
+    create_file: <FileText size={14} />, read_file: <FileCode2 size={14} />, write_file: <FileText size={14} />, delete_file: <Trash size={14} />,
+    move_file: <Move size={14} />, copy_file: <Copy size={14} />, create_directory: <Folder size={14} />,
+    list_directory: <FileSearch size={14} />, find_files: <Search size={14} />, verify_file: <CheckSquare size={14} />,
+    open_browser: <Globe size={14} />, navigate: <Globe size={14} />, browser_click: <MousePointer2 size={14} />,
+    browser_type: <Keyboard size={14} />, browser_search: <Search size={14} />, browser_extract: <Eye size={14} />,
+    wait: <Clock size={14} />, verify_state: <Search size={14} />, default: <Zap size={14} />,
   };
   return icons[action] || icons.default;
 }
@@ -41,15 +42,15 @@ export const ExecutionTimeline: FC<ExecutionTimelineProps> = ({ events, currentP
   if (!currentPlan && taskEvents.length === 0) {
     return (
       <div className="card" style={{ height: '100%' }}>
-        <div className="card-header">
-          <span>📋</span>
+        <div className="card-header flex items-center gap-2">
+          <ListTodo size={18} className="text-primary" />
           <span style={{ fontWeight: 600 }}>Execution Timeline</span>
         </div>
         <div className="card-body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
           <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎙️</div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}><Mic size={48} className="text-muted opacity-50" /></div>
             <p>Speak or type a command to begin</p>
-            <p style={{ fontSize: '0.8rem', marginTop: '0.5rem' }}>VoicePilot will plan, execute, and verify each step</p>
+            <p style={{ fontSize: '0.8rem', marginTop: '0.5rem' }}>PULSE will plan, execute, and verify each step</p>
           </div>
         </div>
       </div>
@@ -58,8 +59,8 @@ export const ExecutionTimeline: FC<ExecutionTimelineProps> = ({ events, currentP
 
   return (
     <div className="card" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div className="card-header">
-        <span>📋</span>
+      <div className="card-header flex items-center gap-2">
+        <ListTodo size={18} className="text-primary" />
         <span style={{ fontWeight: 600 }}>Execution Timeline</span>
         {Boolean(currentPlan?.task) && (
           <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginLeft: 'auto' }} className="truncate">
@@ -94,8 +95,8 @@ export const ExecutionTimeline: FC<ExecutionTimelineProps> = ({ events, currentP
               return (
                 <div key={i} className="timeline-item">
                   <div className="timeline-dot-wrap">
-                    <div className={`timeline-dot ${status}`}>
-                      {status === 'success' ? '✓' : status === 'failed' ? '✕' : getActionIcon(action)}
+                    <div className={`timeline-dot ${status} flex items-center justify-center`}>
+                      {status === 'success' ? <Check size={12} /> : status === 'failed' ? <X size={12} /> : getActionIcon(action)}
                     </div>
                     <div className="timeline-line" />
                   </div>
@@ -142,8 +143,8 @@ const TimelineRow: FC<{ event: AgentEvent; stepIndex: number }> = ({ event }) =>
   return (
     <div className="timeline-item">
       <div className="timeline-dot-wrap">
-        <div className={`timeline-dot ${status}`}>
-          {status === 'success' ? '✓' : status === 'failed' ? '✕' : getActionIcon(action)}
+        <div className={`timeline-dot ${status} flex items-center justify-center`}>
+          {status === 'success' ? <Check size={12} /> : status === 'failed' ? <X size={12} /> : getActionIcon(action)}
         </div>
         <div className="timeline-line" />
       </div>

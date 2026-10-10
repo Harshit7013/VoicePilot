@@ -66,19 +66,17 @@ class Observer:
 
     async def extract_text_from_screen(self, screenshot_path: Optional[str] = None) -> List[str]:
         """Run OCR on a screenshot and return all text strings found."""
-        ocr = self._get_ocr()
-        if ocr is None:
-            return []
-
         if screenshot_path is None:
             screenshot_path = await self.capture_screenshot("ocr_check")
 
         if screenshot_path is None:
             return []
 
-        try:
-            loop = asyncio.get_event_loop()
-            results = await loop.run_in_executor(None, ocr.ocr, screenshot_path, True)
+        def _do_ocr(path: str) -> List[str]:
+            ocr = self._get_ocr()
+            if ocr is None:
+                return []
+            results = ocr.ocr(path, True)
             texts = []
             for line in (results or []):
                 if line:
@@ -86,6 +84,10 @@ class Observer:
                         if item and len(item) >= 2 and item[1]:
                             texts.append(item[1][0])
             return texts
+
+        try:
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(None, _do_ocr, screenshot_path)
         except Exception as e:
             logger.warning(f"OCR failed: {e}")
             return []

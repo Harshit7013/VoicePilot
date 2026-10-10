@@ -4,6 +4,7 @@
 
 import { type FC, useEffect, useRef } from 'react';
 import type { AgentEvent } from '../hooks/useVoicePilot';
+import { Activity } from 'lucide-react';
 
 interface EventLogProps {
   events: AgentEvent[];
@@ -56,8 +57,8 @@ export const EventLog: FC<EventLogProps> = ({ events }) => {
 
   return (
     <div className="card">
-      <div className="card-header">
-        <span>⚡</span>
+      <div className="card-header flex items-center gap-2">
+        <Activity size={18} className="text-primary" />
         <span style={{ fontWeight: 600 }}>Live Event Log</span>
         <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
           {events.length} events

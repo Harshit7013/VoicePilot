@@ -59,14 +59,22 @@ class PiperTTSProvider(TTSProvider):
             Path(out_path).unlink(missing_ok=True)
 
     async def speak(self, text: str) -> None:
-        """Speak text aloud using the best available TTS backend."""
+        """Speak text aloud using Piper, falling back gracefully if missing."""
         logger.info(f"TTS: {text}")
 
         if self._piper_available:
-            audio_bytes = await self._synthesize_piper(text)
-            await self._play_audio(audio_bytes)
-        else:
+            try:
+                audio_bytes = await self._synthesize_piper(text)
+                await self._play_audio(audio_bytes)
+                return
+            except Exception as e:
+                logger.warning(f"Piper TTS synthesis failed: {e}. Trying fallback.")
+
+        # Fallback to OS TTS
+        try:
             await self._os_fallback_speak(text)
+        except Exception as e:
+            logger.warning(f"OS TTS fallback failed: {e}. Continuing silently.")
 
     async def _play_audio(self, audio_bytes: bytes) -> None:
         """Play WAV audio bytes via sounddevice or afplay."""
@@ -95,10 +103,16 @@ class PiperTTSProvider(TTSProvider):
                 Path(tmp_path).unlink(missing_ok=True)
 
     async def _os_fallback_speak(self, text: str) -> None:
-        """Use macOS 'say' or Linux 'espeak' as fallback."""
+        """Use macOS 'say', Windows Powershell, or Linux 'espeak' as fallback."""
         import sys
+        import subprocess
         if sys.platform == "darwin":
-            proc = await asyncio.create_subprocess_exec("say", text)
+            proc = subprocess.Popen(["say", text], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elif sys.platform == "win32":
+            # Using PowerShell to speak the text on Windows natively without external dependencies
+            escaped_text = text.replace("'", "''")
+            script = f"Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('{escaped_text}')"
+            proc = subprocess.Popen(["powershell", "-Command", script], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         else:
-            proc = await asyncio.create_subprocess_exec("espeak", text)
-        await proc.wait()
+            proc = subprocess.Popen(["espeak", text], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+

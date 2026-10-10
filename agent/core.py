@@ -72,6 +72,8 @@ class VoicePilotAgent:
         classifier = RiskClassifier()
         cb = confirmation_callback or self._default_confirmation_callback
         self.safety = PolicyGate(classifier, cb, auto_approve_medium=auto_approve_medium)
+        
+        self.conversation_history: List[str] = []
 
     # ──────────────────────────────────────────────
     # Public API
@@ -108,7 +110,26 @@ class VoicePilotAgent:
             # Stage 1 & 2: (Transcription already done — text passed in directly)
             # Stage 3: Plan
             await self._emit("planning", {"task_id": task_id, "command": text})
-            plan = await self.planner.plan(text)
+            agent_response = await self.planner.plan(text, self.conversation_history)
+            
+            # Update history and keep last 10 messages
+            self.conversation_history.append(f"User: {text}")
+            self.conversation_history.append(f"Agent: {agent_response.message}")
+            if len(self.conversation_history) > 10:
+                self.conversation_history = self.conversation_history[-10:]
+                
+            # Speak the conversational response immediately
+            # await self.tts.speak(agent_response.message)
+            
+            plan = agent_response.plan
+            if not plan:
+                # Conversational response only, no action to execute
+                result = TaskResult(task_id=task_id, task=text, success=True)
+                await self._emit("task_complete", result.model_dump())
+                duration = time.time() - start_time
+                await self.metrics.record_task_complete(task_id, True, duration, 0, None)
+                return result
+
             await self._emit("plan_ready", {
                 "task_id": task_id,
                 "task": plan.task,
@@ -144,7 +165,7 @@ class VoicePilotAgent:
                 if success
                 else f"Task failed: {error or 'Unknown error'}"
             )
-            await self.tts.speak(completion_msg)
+            # await self.tts.speak(completion_msg)
             await self._emit("task_complete", result.model_dump())
             await self.metrics.record_task_complete(task_id, success, duration, total_retries, error)
             return result
@@ -166,11 +187,28 @@ class VoicePilotAgent:
 
     async def run_audio(self, audio_bytes: bytes, sample_rate: int = 16000) -> TaskResult:
         """Process raw audio through STT then run_command."""
+        task_id = str(uuid.uuid4())
         await self._emit("transcribing", {})
-        result = await self.stt.transcribe(audio_bytes, sample_rate)
-        logger.info(f"Transcribed: {result.text!r} (lang={result.language}, conf={result.confidence:.2f})")
-        await self._emit("transcribed", {"text": result.text, "confidence": result.confidence})
-        return await self.run_command(result.text)
+        try:
+            result = await self.stt.transcribe(audio_bytes, sample_rate)
+            logger.info(f"Transcribed: {result.text!r} (lang={result.language}, conf={result.confidence:.2f})")
+            await self._emit("transcribed", {"text": result.text, "confidence": result.confidence})
+            return await self.run_command(result.text)
+        except Exception as e:
+            logger.error(f"STT Error: {e}", exc_info=True)
+            error_msg = str(e)
+            await self._emit("task_error", {"task_id": task_id, "error": error_msg})
+            try:
+                await self.tts.speak(f"Speech to text error: {error_msg}")
+            except Exception:
+                pass
+            return TaskResult(
+                task_id=task_id,
+                task="Voice Command",
+                success=False,
+                error=error_msg,
+                duration_seconds=0,
+            )
 
     async def confirm(self, confirmation_id: str, approved: bool) -> None:
         """Called by the API layer when the user approves/rejects a confirmation."""

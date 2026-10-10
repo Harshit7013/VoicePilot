@@ -18,7 +18,7 @@ from agent.providers import MockSTTProvider, MockLLMProvider, MockTTSProvider
 class TestLLMPlanner(unittest.TestCase):
     def test_prompt_generation(self):
         planner = Planner(llm=MockLLMProvider())
-        prompt = planner._build_prompt("Create hello.py on Desktop")
+        prompt = planner._build_prompt("Create hello.py on Desktop", [])
         self.assertIn("Create hello.py on Desktop", prompt)
         self.assertIn("JSON", prompt)
 
@@ -129,7 +129,7 @@ class TestFileExecutor(unittest.TestCase):
 
     def test_path_expansion(self):
         expanded = _resolve("~/Desktop/test.txt")
-        self.assertTrue(str(expanded).endswith("/Desktop/test.txt"))
+        self.assertTrue(str(expanded).replace('\\', '/').endswith("/Desktop/test.txt"))
         self.assertFalse(str(expanded).startswith("~"))
 
     def test_unsupported_action(self):
@@ -150,5 +150,68 @@ class TestRecoveryManager(unittest.TestCase):
         self.assertEqual(alt["action"], "press_key")
 
 
+class TestDynamicAppResolution(unittest.TestCase):
+    def test_planner_extract_app_phrasing_and_casing(self):
+        test_cases = [
+            ("open a application Netflix", "Netflix"),
+            ("open an application netflix", "netflix"),
+            ("open application Netflix", "Netflix"),
+            ("open Netflix", "Netflix"),
+            ("Open Netflix", "Netflix"),
+            ("open netflix", "netflix"),
+            ("OPEN NETFLIX", "NETFLIX"),
+            ("start Netflix", "Netflix"),
+            ("launch Netflix", "Netflix"),
+            ("open the Netflix app", "Netflix"),
+            ("open the netflix application", "netflix"),
+            ("can you please open a application Netflix", "Netflix"),
+            ("please open Google Chrome", "Google Chrome"),
+            ("start the app named Spotify", "Spotify"),
+        ]
+        for cmd, expected in test_cases:
+            target = Planner._extract_open_app_target(cmd)
+            self.assertEqual(target.lower(), expected.lower(), f"Failed to extract from: {cmd!r}")
+
+    def test_planner_fast_path(self):
+        planner = Planner(llm=MockLLMProvider())
+        resp = asyncio.run(planner.plan("open a application Netflix"))
+        self.assertIsNotNone(resp.plan)
+        self.assertEqual(resp.plan.steps[0]["action"], "open_application")
+        self.assertEqual(resp.plan.steps[0]["application"].lower(), "netflix")
+
+    def test_desktop_resolve_app_casing_and_fallback(self):
+        from agent.executor.desktop import DesktopExecutor
+        executor = DesktopExecutor()
+        dummy_aliases = {
+            "netflix": "explorer.exe shell:AppsFolder\\dummy_netflix_appid",
+            "chrome": "chrome.exe",
+            "google chrome": "chrome.exe",
+        }
+        # Exact lowercase
+        target, name, _ = executor._resolve_target_app("netflix", dummy_aliases)
+        self.assertIn("dummy_netflix_appid", target)
+        
+        # Uppercase
+        target, name, _ = executor._resolve_target_app("Netflix", dummy_aliases)
+        self.assertIn("dummy_netflix_appid", target)
+        
+        # All caps
+        target, name, _ = executor._resolve_target_app("NETFLIX", dummy_aliases)
+        self.assertIn("dummy_netflix_appid", target)
+
+        # Prefixed with phrasing
+        target, name, _ = executor._resolve_target_app("a application Netflix", dummy_aliases)
+        self.assertIn("dummy_netflix_appid", target)
+        
+        # Suffix app
+        target, name, _ = executor._resolve_target_app("the Netflix app", dummy_aliases)
+        self.assertIn("dummy_netflix_appid", target)
+
+        # Nonexistent app should return None, NOT a command that opens Microsoft Store
+        target, name, _ = executor._resolve_target_app("completely_nonexistent_xyz_app", dummy_aliases)
+        self.assertIsNone(target)
+
+
 if __name__ == '__main__':
     unittest.main()
+

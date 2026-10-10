@@ -43,8 +43,7 @@ class WhisperSTTProvider(STTProvider):
             self._model = WhisperModel(self.model_size, device=self.device, compute_type=self.compute_type)
             logger.info("Whisper model loaded successfully.")
         except ImportError:
-            logger.warning("faster-whisper not installed. Using simulated STT.")
-            self._model = "SIMULATED"
+            raise RuntimeError("faster-whisper is not installed. Please run 'pip install faster-whisper' to enable local speech-to-text.")
 
     async def transcribe(self, audio_data: bytes, sample_rate: int = 16000) -> TranscriptionResult:
         self._load_model()

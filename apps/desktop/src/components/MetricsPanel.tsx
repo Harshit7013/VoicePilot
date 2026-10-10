@@ -4,6 +4,7 @@
 
 import type { FC } from 'react';
 import type { MetricsSummary, TaskRecord } from '../hooks/useVoicePilot';
+import { BarChart2, History, CheckCircle2, XCircle, Hourglass } from 'lucide-react';
 
 interface MetricsPanelProps {
   metrics: MetricsSummary | null;
@@ -25,8 +26,8 @@ export const MetricsPanel: FC<MetricsPanelProps> = ({ metrics, tasks }) => (
   <aside className="metrics-panel flex-col gap-4" style={{ display: 'flex' }}>
     {/* Reliability Metrics */}
     <div className="card">
-      <div className="card-header">
-        <span>📊</span>
+      <div className="card-header flex items-center gap-2">
+        <BarChart2 size={18} className="text-primary" />
         <span style={{ fontWeight: 600 }}>Reliability Metrics</span>
       </div>
       <div className="card-body">
@@ -55,7 +56,7 @@ export const MetricsPanel: FC<MetricsPanelProps> = ({ metrics, tasks }) => (
           </div>
         ) : (
           <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem 0' }}>
-            <div style={{ fontSize: '2rem' }}>📊</div>
+            <div style={{ display: 'flex', justifyContent: 'center' }}><BarChart2 size={32} className="opacity-50" /></div>
             <p style={{ marginTop: '0.5rem', fontSize: '0.8rem' }}>Run tasks to see metrics</p>
           </div>
         )}
@@ -64,8 +65,8 @@ export const MetricsPanel: FC<MetricsPanelProps> = ({ metrics, tasks }) => (
 
     {/* Task History */}
     <div className="card" style={{ flex: 1 }}>
-      <div className="card-header">
-        <span>📜</span>
+      <div className="card-header flex items-center gap-2">
+        <History size={18} className="text-primary" />
         <span style={{ fontWeight: 600 }}>Task History</span>
         <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
           {tasks.length} tasks
@@ -79,8 +80,8 @@ export const MetricsPanel: FC<MetricsPanelProps> = ({ metrics, tasks }) => (
         ) : (
           tasks.map(task => (
             <div key={task.id} className="task-item">
-              <div className="task-icon">
-                {task.status === 'success' ? '✅' : task.status === 'failed' ? '❌' : '⏳'}
+              <div className="task-icon flex items-center justify-center">
+                {task.status === 'success' ? <CheckCircle2 size={16} className="text-success" /> : task.status === 'failed' ? <XCircle size={16} className="text-danger" /> : <Hourglass size={16} className="text-warning animate-pulse" />}
               </div>
               <div className="task-info">
                 <div className="task-name" title={task.task}>{task.task}</div>

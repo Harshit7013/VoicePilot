@@ -24,7 +24,7 @@ class LocalOfflineLLMProvider(LLMProvider):
     Requires ZERO internet access.
     """
 
-    def __init__(self, model: str = "qwen2.5:7b", host: str = "http://localhost:11434"):
+    def __init__(self, model: str = "qwen2.5:1.5b", host: str = "http://localhost:11434"):
         self.model = model
         self.host = host
         self._ollama_available: Optional[bool] = None
@@ -151,16 +151,21 @@ class LocalOfflineLLMProvider(LLMProvider):
 
         # ── 5. Application Launching ──────────
         if "open" in p_lower or "launch" in p_lower or "start" in p_lower:
-            words = p.split()
-            app_name = words[-1].title() if len(words) > 1 else "Calculator"
-            if "browser" in p_lower or "chrome" in p_lower:
-                app_name = "Google Chrome"
-            elif "vs" in p_lower or "code" in p_lower:
-                app_name = "Visual Studio Code"
-            elif "terminal" in p_lower:
-                app_name = "Terminal"
-            elif "calc" in p_lower:
-                app_name = "Calculator"
+            from agent.planner.planner import Planner
+            extracted = Planner._extract_open_app_target(p)
+            if extracted:
+                app_name = extracted
+            else:
+                words = p.split()
+                app_name = words[-1].title() if len(words) > 1 else "Calculator"
+                if "browser" in p_lower or "chrome" in p_lower:
+                    app_name = "Google Chrome"
+                elif "vs" in p_lower or "code" in p_lower:
+                    app_name = "Visual Studio Code"
+                elif "terminal" in p_lower:
+                    app_name = "Terminal"
+                elif "calc" in p_lower:
+                    app_name = "Calculator"
 
             return {
                 "task": f"Open application {app_name}",

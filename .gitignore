@@ -38,8 +38,15 @@ apps/desktop/tsconfig.tsbuildinfo
 data/*.db
 data/*.sqlite
 data/*.sqlite3
+data/*.json
 data/screenshots/*
 !data/screenshots/.gitkeep
+
+# Executables
+*.exe
+
+# Temporary Test Files
+/test_*.py
 
 # IDE & Editor files
 .vscode/

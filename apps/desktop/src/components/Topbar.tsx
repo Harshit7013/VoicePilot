@@ -3,6 +3,7 @@
  */
 
 import type { FC } from 'react';
+import { Mic, Lock } from 'lucide-react';
 
 interface TopbarProps {
   connected: boolean;
@@ -39,8 +40,8 @@ export const Topbar: FC<TopbarProps> = ({ connected, agentState }) => {
   return (
     <header className="topbar">
       <div className="topbar-brand">
-        <div className="brand-icon">🎙️</div>
-        <span className="brand-title">VoicePilot</span>
+        <Mic className="brand-icon text-primary" size={20} />
+        <span className="brand-title">PULSE</span>
         <span className="brand-badge">Offline</span>
       </div>
 
@@ -51,7 +52,7 @@ export const Topbar: FC<TopbarProps> = ({ connected, agentState }) => {
 
       <div className="flex items-center gap-3">
         <span className="text-xs text-muted">v1.0.0</span>
-        <span className="text-xs" title="Privacy-first" style={{ color: 'var(--accent-success)' }}>🔒 Local</span>
+        <span className="text-xs flex items-center gap-1" title="Privacy-first" style={{ color: 'var(--accent-success)' }}><Lock size={12} /> Local</span>
       </div>
     </header>
   );

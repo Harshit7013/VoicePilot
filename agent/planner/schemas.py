@@ -240,6 +240,11 @@ class ActionPlan(BaseModel):
         return [adapter.validate_python(step) for step in self.steps]
 
 
+class AgentResponse(BaseModel):
+    message: str = Field(..., description="Conversational response to speak to the user")
+    plan: Optional[ActionPlan] = Field(default=None, description="The action plan to execute, if applicable")
+
+
 class StepResult(BaseModel):
     step_index: int
     action: str

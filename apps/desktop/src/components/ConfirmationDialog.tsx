@@ -4,6 +4,7 @@
 
 import type { FC } from 'react';
 import type { ConfirmationRequest } from '../hooks/useVoicePilot';
+import { AlertTriangle, Lock } from 'lucide-react';
 
 interface ConfirmationDialogProps {
   request: ConfirmationRequest;
@@ -14,7 +15,7 @@ const HIGH_RISK_ACTIONS = new Set(['delete_file', 'delete_directory']);
 
 export const ConfirmationDialog: FC<ConfirmationDialogProps> = ({ request, onConfirm }) => {
   const isHigh = HIGH_RISK_ACTIONS.has(request.action);
-  const icon = isHigh ? '⚠️' : '🔒';
+  const icon = isHigh ? <AlertTriangle size={32} className="text-danger" /> : <Lock size={32} className="text-warning" />;
   const title = isHigh ? 'High-Risk Action' : 'Action Confirmation';
 
   return (

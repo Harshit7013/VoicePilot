@@ -1,5 +1,5 @@
 /**
- * VoicePilot — Main Application Entry Point
+ * PULSE — Main Application Entry Point
  * Wires together all UI components with the agent hook.
  */
 

@@ -13,8 +13,8 @@ from agent.providers.base import LLMProvider, LLMResponse
 
 logger = logging.getLogger(__name__)
 
-PLANNER_SYSTEM_PROMPT = """You are VoicePilot, an offline desktop automation agent.
-Your job is to convert a user's voice command into a structured JSON action plan.
+PLANNER_SYSTEM_PROMPT = """You are PULSE (Personal Unleashed AI), an offline desktop automation agent.
+Your job is to act as a conversational assistant that can also execute structured JSON action plans.
 
 RULES:
 1. Only use actions from the approved vocabulary.
@@ -32,12 +32,14 @@ System: wait, verify_state
 
 OUTPUT FORMAT (JSON only, no markdown):
 {
-  "task": "<human-readable task description>",
-  "expected_outcome": "<what success looks like>",
-  "steps": [
-    {"action": "<action_name>", "<param>": "<value>", "risk": "low|medium|high"},
-    ...
-  ]
+  "message": "<A human-centric, conversational response. If ambiguous, ask for clarification.>",
+  "plan": {
+    "task": "<human-readable task description>",
+    "expected_outcome": "<what success looks like>",
+    "steps": [
+      {"action": "<action_name>", "<param>": "<value>", "risk": "low|medium|high"}
+    ]
+  } // OR null if you just need to speak a message/ask a question.
 }
 """
 
@@ -48,7 +50,7 @@ class OllamaLLMProvider(LLMProvider):
     Model: qwen3:latest or qwen2.5:7b or any Ollama-compatible model.
     """
 
-    def __init__(self, model: str = "qwen2.5:7b", host: str = "http://localhost:11434"):
+    def __init__(self, model: str = "qwen2.5:1.5b", host: str = "http://localhost:11434"):
         self.model = model
         self.host = host
         self._client = None
@@ -68,7 +70,7 @@ class OllamaLLMProvider(LLMProvider):
         client = self._get_client()
 
         if client is None:
-            return self._simulated_response(prompt)
+            raise RuntimeError("Ollama LLM is not installed. Please install Ollama and run 'ollama pull qwen2.5:7b'.")
 
         try:
             messages = []
@@ -83,15 +85,14 @@ class OllamaLLMProvider(LLMProvider):
             return LLMResponse(content=content, model=self.model, tokens_used=tokens)
 
         except Exception as e:
-            logger.warning(f"Ollama request failed: {e}. Using simulated response.")
-            return self._simulated_response(prompt)
+            logger.warning(f"Ollama request failed: {e}")
+            raise RuntimeError(f"Ollama LLM request failed. Ensure Ollama is running (localhost:11434). Error: {e}")
 
     async def stream(self, prompt: str, system: Optional[str] = None) -> AsyncIterator[str]:
         client = self._get_client()
 
         if client is None:
-            yield self._simulated_response(prompt).content
-            return
+            raise RuntimeError("Ollama LLM is not installed. Please install Ollama and run 'ollama pull qwen2.5:7b'.")
 
         messages = []
         if system:
@@ -104,58 +105,4 @@ class OllamaLLMProvider(LLMProvider):
                     yield chunk.message.content
         except Exception as e:
             logger.error(f"Streaming error: {e}")
-            yield self._simulated_response(prompt).content
-
-    def _simulated_response(self, prompt: str) -> LLMResponse:
-        """Pattern-aware simulated response fallback when Ollama model is offline."""
-        prompt_lower = prompt.lower()
-
-        if "calculator" in prompt_lower or "calc" in prompt_lower or "calculate" in prompt_lower:
-            plan = {
-                "task": "Open Calculator",
-                "expected_outcome": "Calculator application is opened",
-                "steps": [
-                    {"action": "open_application", "application": "Calculator", "risk": "low"},
-                ]
-            }
-        elif "code" in prompt_lower or "hello.py" in prompt_lower or "vs code" in prompt_lower or "vscode" in prompt_lower:
-            plan = {
-                "task": "Create hello.py in VS Code",
-                "expected_outcome": "hello.py created on Desktop",
-                "steps": [
-                    {"action": "open_application", "application": "Visual Studio Code", "risk": "low"},
-                    {"action": "create_file", "path": "~/Desktop/hello.py", "risk": "medium"},
-                    {"action": "write_file", "path": "~/Desktop/hello.py", "content": "print('Hello World')", "risk": "medium"},
-                    {"action": "verify_file", "path": "~/Desktop/hello.py", "risk": "low"}
-                ]
-            }
-        elif "browser" in prompt_lower or "search" in prompt_lower or "google" in prompt_lower:
-            plan = {
-                "task": "Search web in browser",
-                "expected_outcome": "Browser opened with search results",
-                "steps": [
-                    {"action": "open_browser", "url": "https://www.google.com", "risk": "low"},
-                    {"action": "browser_search", "query": prompt, "risk": "low"}
-                ]
-            }
-        elif "download" in prompt_lower or "pdf" in prompt_lower:
-            plan = {
-                "task": "Organize PDF files in Downloads",
-                "expected_outcome": "PDF files moved to Desktop/PDFs",
-                "steps": [
-                    {"action": "find_files", "path": "~/Downloads", "pattern": "*.pdf", "risk": "low"},
-                    {"action": "create_directory", "path": "~/Desktop/PDFs", "risk": "medium"},
-                ]
-            }
-        else:
-            plan = {
-                "task": prompt,
-                "expected_outcome": "Command executed successfully",
-                "steps": [
-                    {"action": "create_directory", "path": "~/Desktop/HackathonDemo", "risk": "medium"},
-                    {"action": "create_file", "path": "~/Desktop/HackathonDemo/voicepilot.txt",
-                     "content": f"VoicePilot executed: {prompt}", "risk": "medium"},
-                    {"action": "verify_file", "path": "~/Desktop/HackathonDemo/voicepilot.txt", "risk": "low"},
-                ],
-            }
-        return LLMResponse(content=json.dumps(plan), model="simulated-qwen3", tokens_used=0)
+            raise RuntimeError(f"Ollama LLM streaming failed. Ensure Ollama is running (localhost:11434). Error: {e}")
