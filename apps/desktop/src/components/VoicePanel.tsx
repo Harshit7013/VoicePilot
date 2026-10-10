@@ -1,197 +1,226 @@
-/**
- * VoicePanel — microphone button, waveform, and text command input.
- */
-
-import { type FC, type KeyboardEvent, useRef, useState } from 'react';
-import { Mic, Square, Loader2, Send, Camera, MessageSquare } from 'lucide-react';
+import { type FC, type FormEvent, useEffect, useRef, useState } from 'react';
+import { Camera, Mic, Send, Square, Type } from 'lucide-react';
 
 interface VoicePanelProps {
   agentState: string;
   onCommand: (command: string) => void;
 }
 
+type Mode = 'camera' | 'voice' | 'text';
+
+interface SpeechRecognitionLike {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+
+interface SpeechRecognitionEventLike {
+  results: ArrayLike<{ isFinal: boolean; [index: number]: { transcript: string } }>;
+}
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+
+const stateLabel: Record<string, string> = {
+  planning: 'Preparing your request…',
+  transcribing: 'Transcribing…',
+  executing: 'Working on it…',
+  complete: 'Done',
+  error: 'Something went wrong',
+};
+
 export const VoicePanel: FC<VoicePanelProps> = ({ agentState, onCommand }) => {
-  const [text, setText] = useState('');
+  const [mode, setMode] = useState<Mode>('voice');
+  const [command, setCommand] = useState('');
   const [listening, setListening] = useState(false);
-  const [mode, setMode] = useState<'camera' | 'voice' | 'text'>('voice');
-  const recognitionRef = useRef<any>(null);
+  const [notice, setNotice] = useState('Tap the microphone and say what you need.');
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Initialize SpeechRecognition
-  if (typeof window !== 'undefined' && !recognitionRef.current) {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = true;
-      recognition.lang = 'en-US';
-      recognitionRef.current = recognition;
-    }
-  }
+  const isBusy = !['idle', 'complete', 'error'].includes(agentState);
 
-  const isbusy = agentState !== 'idle' && agentState !== 'complete' && agentState !== 'error';
-
-  const handleVoiceToggle = () => {
-    if (listening) {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
+  useEffect(() => {
+    const recognitionConstructor = (
+      window as Window & {
+        SpeechRecognition?: SpeechRecognitionConstructor;
+        webkitSpeechRecognition?: SpeechRecognitionConstructor;
       }
+    ).SpeechRecognition || (
+      window as Window & { webkitSpeechRecognition?: SpeechRecognitionConstructor }
+    ).webkitSpeechRecognition;
+
+    if (!recognitionConstructor) return;
+
+    const recognition = new recognitionConstructor();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+    recognitionRef.current = recognition;
+
+    recognition.onresult = (event) => {
+      const transcript = Array.from(event.results)
+        .map((result) => result[0].transcript)
+        .join('')
+        .trim();
+      const isFinal = Array.from(event.results).some((result) => result.isFinal);
+
+      setCommand(transcript);
+      setNotice(transcript ? `I heard: “${transcript}”` : 'Listening…');
+
+      if (isFinal && transcript) {
+        setListening(false);
+        onCommand(transcript);
+      }
+    };
+
+    recognition.onerror = ({ error }) => {
       setListening(false);
-    } else {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.onresult = (event: any) => {
-            const transcript = Array.from(event.results)
-              .map((result: any) => result[0].transcript)
-              .join('');
-            
-            setText(transcript);
+      setNotice(
+        error === 'not-allowed'
+          ? 'Microphone access is blocked. Allow it in your browser settings and try again.'
+          : 'I could not hear that. Please try again.',
+      );
+    };
 
-            // Stop listening when final, but DO NOT auto-submit so the user can edit.
-            if (event.results[0].isFinal) {
-              setListening(false);
-            }
-          };
+    recognition.onend = () => setListening(false);
 
-          recognitionRef.current.onerror = (event: any) => {
-            console.error('Speech recognition error:', event.error);
-            setListening(false);
-            if (event.error !== 'no-speech') {
-              alert(`Speech recognition error: ${event.error}`);
-            }
-          };
-
-          recognitionRef.current.onend = () => {
-            setListening(false);
-          };
-
-          recognitionRef.current.start();
-          setListening(true);
-        } catch (e: any) {
-          alert(`Speech recognition failed to start: ${e.message}`);
-        }
-      } else {
-        alert("Speech recognition is not supported in this browser. Please use Chrome or Edge.");
+    return () => {
+      try {
+        recognition.stop();
+      } catch {
+        // Recognition was never started or has already stopped.
       }
+      recognitionRef.current = null;
+    };
+  }, [onCommand]);
+
+  useEffect(() => {
+    if (mode === 'text') inputRef.current?.focus();
+  }, [mode]);
+
+  const selectCamera = () => {
+    setMode('camera');
+    if (isBusy) return;
+
+    setNotice('Capturing your screen…');
+    onCommand('take a screenshot of the screen');
+  };
+
+  const toggleListening = () => {
+    setMode('voice');
+    if (isBusy) return;
+
+    const recognition = recognitionRef.current;
+    if (!recognition) {
+      setNotice('Speech recognition is unavailable here. You can use the text option instead.');
+      return;
+    }
+
+    if (listening) {
+      recognition.stop();
+      setListening(false);
+      setNotice('Listening stopped.');
+      return;
+    }
+
+    try {
+      setCommand('');
+      setNotice('Listening…');
+      recognition.start();
+      setListening(true);
+    } catch {
+      setNotice('The microphone is already starting. Please speak when it is ready.');
     }
   };
 
-  const handleTextSubmit = () => {
-    const trimmed = text.trim();
-    if (trimmed && !isbusy) {
-      onCommand(trimmed);
-      setText('');
-      setMode('text'); // Switch back to text or remain in current mode
-    }
+  const selectText = () => {
+    setMode('text');
+    setNotice('Type a request and press Enter or Send.');
   };
 
-  const handleCameraSubmit = () => {
-    onCommand("take a screenshot of the screen");
+  const submitText = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmed = command.trim();
+    if (!trimmed || isBusy) return;
+
+    onCommand(trimmed);
+    setCommand('');
+    setNotice('Preparing your request…');
   };
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') handleTextSubmit();
-  };
+  const currentNotice = isBusy ? stateLabel[agentState] ?? 'Working…' : notice;
 
   return (
-    <div className="card" style={{ overflow: 'hidden', padding: 0 }}>
-      {/* 3 Main Mode Options */}
-      <div className="flex border-b border-white/10" style={{ backgroundColor: 'rgba(0,0,0,0.2)' }}>
+    <section className="command-launcher" aria-label="VoicePilot command options">
+      <div className="launcher-copy">
+        <p className="product-name">VoicePilot</p>
+        <h1>What would you like to do?</h1>
+        <p className="launcher-subtitle">Choose a way to start a command.</p>
+      </div>
+
+      <div className="command-options" aria-label="Command input options">
         <button
-          className={`flex-1 flex flex-col items-center gap-2 py-4 transition-all ${mode === 'camera' ? 'bg-primary/20 text-primary border-b-2 border-primary' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
-          onClick={() => setMode('camera')}
+          className={`command-option ${mode === 'camera' ? 'is-selected' : ''}`}
+          onClick={selectCamera}
+          disabled={isBusy}
+          type="button"
+          aria-label="Capture screen"
         >
-          <Camera size={24} />
-          <span className="text-xs font-semibold uppercase tracking-wider">Screenshot</span>
+          <span className="option-icon"><Camera aria-hidden="true" size={27} strokeWidth={1.8} /></span>
+          <span>Camera</span>
         </button>
+
         <button
-          className={`flex-1 flex flex-col items-center gap-2 py-4 transition-all ${mode === 'voice' ? 'bg-primary/20 text-primary border-b-2 border-primary' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
-          onClick={() => setMode('voice')}
+          className={`command-option command-option--mic ${mode === 'voice' ? 'is-selected' : ''} ${listening ? 'is-listening' : ''}`}
+          onClick={toggleListening}
+          disabled={isBusy}
+          type="button"
+          aria-label={listening ? 'Stop listening' : 'Start listening'}
+          aria-pressed={listening}
         >
-          <Mic size={24} />
-          <span className="text-xs font-semibold uppercase tracking-wider">Voice</span>
+          <span className="option-icon">
+            {listening ? <Square aria-hidden="true" size={22} fill="currentColor" /> : <Mic aria-hidden="true" size={29} strokeWidth={1.8} />}
+          </span>
+          <span>{listening ? 'Listening' : 'Mic'}</span>
         </button>
+
         <button
-          className={`flex-1 flex flex-col items-center gap-2 py-4 transition-all ${mode === 'text' ? 'bg-primary/20 text-primary border-b-2 border-primary' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
-          onClick={() => setMode('text')}
+          className={`command-option ${mode === 'text' ? 'is-selected' : ''}`}
+          onClick={selectText}
+          disabled={isBusy}
+          type="button"
+          aria-label="Type a command"
         >
-          <MessageSquare size={24} />
-          <span className="text-xs font-semibold uppercase tracking-wider">Text</span>
+          <span className="option-icon"><Type aria-hidden="true" size={27} strokeWidth={1.8} /></span>
+          <span>Text</span>
         </button>
       </div>
 
-      <div className="p-5 flex flex-col gap-4 min-h-[220px] justify-center relative">
-        {/* Agent Status Overlay */}
-        {isbusy && (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm">
-            <Loader2 size={32} className="animate-spin text-primary mb-3" />
-            <span className="text-sm font-medium text-white/90 uppercase tracking-widest">
-              {agentState === 'planning' ? 'Planning...' : agentState === 'executing' ? 'Executing Task...' : 'Working...'}
-            </span>
-          </div>
-        )}
-
-        {/* Camera Mode */}
-        {mode === 'camera' && (
-          <div className="flex flex-col items-center justify-center gap-4 animate-in fade-in zoom-in duration-300">
-            <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center text-primary mb-2 shadow-[0_0_15px_rgba(var(--primary-rgb),0.3)]">
-              <Camera size={32} />
-            </div>
-            <p className="text-sm text-center text-gray-300 mb-2">
-              Take a screenshot of your screen to analyze or work on it.
-            </p>
-            <button
-              className="btn btn-primary px-8 py-3 rounded-full text-sm font-bold shadow-lg"
-              onClick={handleCameraSubmit}
-              disabled={isbusy}
-            >
-              Capture Screen
+      <div className="command-response" aria-live="polite">
+        {mode === 'text' ? (
+          <form className="text-command-form" onSubmit={submitText}>
+            <label className="sr-only" htmlFor="command-input">Type your command</label>
+            <input
+              ref={inputRef}
+              id="command-input"
+              className="text-command-input"
+              value={command}
+              onChange={(event) => setCommand(event.target.value)}
+              placeholder="Type a command…"
+              disabled={isBusy}
+            />
+            <button className="send-command" type="submit" disabled={isBusy || !command.trim()} aria-label="Send command">
+              <Send aria-hidden="true" size={19} strokeWidth={2} />
             </button>
-          </div>
-        )}
-
-        {/* Voice Mode */}
-        {mode === 'voice' && (
-          <div className="flex flex-col items-center gap-4 animate-in fade-in zoom-in duration-300 w-full">
-            <button
-              className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 shadow-xl ${listening ? 'bg-danger text-white scale-110 shadow-[0_0_30px_rgba(255,50,50,0.6)] animate-pulse' : 'bg-primary text-black hover:scale-105'}`}
-              onClick={handleVoiceToggle}
-              disabled={isbusy}
-            >
-              {listening ? <Square size={28} /> : <Mic size={32} />}
-            </button>
-            <p className="text-xs text-gray-400 font-medium">
-              {listening ? "Recording... Click to stop." : "Click to speak"}
-            </p>
-          </div>
-        )}
-
-        {/* Text/Edit Mode (Shown in both Voice and Text modes so they can edit Voice) */}
-        {(mode === 'text' || mode === 'voice') && (
-          <div className="mt-auto animate-in slide-in-from-bottom-4 duration-300">
-            {mode === 'voice' && text && (
-              <p className="text-xs text-primary mb-2 font-medium px-1">Review & edit your command:</p>
-            )}
-            <div className="relative flex items-center">
-              <input
-                type="text"
-                className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-4 pr-12 text-sm text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all placeholder:text-gray-500"
-                placeholder={mode === 'voice' ? "Or type a command here..." : "Type your command..."}
-                value={text}
-                onChange={e => setText(e.target.value)}
-                onKeyDown={handleKeyDown}
-                disabled={isbusy}
-              />
-              <button
-                className="absolute right-2 p-2 rounded-xl bg-primary text-black hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                onClick={handleTextSubmit}
-                disabled={isbusy || !text.trim()}
-              >
-                <Send size={16} />
-              </button>
-            </div>
-          </div>
+          </form>
+        ) : (
+          <p className={`command-notice ${listening ? 'is-listening' : ''}`}>{currentNotice}</p>
         )}
       </div>
-    </div>
+    </section>
   );
 };
